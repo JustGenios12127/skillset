@@ -1,3 +1,17 @@
+# Skillset — Сайт по пожарной безопасности
+
+## Деплой на GitHub Pages
+
+```bash
+npm run deploy
+```
+
+Сайт будет доступен по адресу: **https://JustGenios12127.github.io/skillset/**
+
+> В GitHub Settings → Pages выбери: Source → `gh-pages` branch, папка `/ (root)`.
+
+---
+
 # Welcome to your Lovable project
 
 ## Project info
