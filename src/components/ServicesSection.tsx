@@ -1,256 +1,133 @@
 import { useInView } from "@/hooks/useInView";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Search, FileText, Lightbulb, Flame, GraduationCap,
   Settings, Map, ShieldCheck, FlaskConical, Paintbrush,
-  Image, BookOpen, Tag, LayoutGrid, ChevronDown, ChevronUp
+  Image, BookOpen, Tag, LayoutGrid, ChevronDown, ChevronUp,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
-interface ServiceItem {
-  name: string;
-  price: string;
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-interface ServiceCategory {
-  icon: React.ElementType;
+interface ServiceRow {
+  id: string;
   title: string;
-  description?: string;
-  services: ServiceItem[];
+  price_type: "negotiable" | "fixed";
+  price: number | null;
+  currency: string;
+  sort_order: number;
 }
 
-const categories: ServiceCategory[] = [
-  {
-    icon: Search,
-    title: "Аудит и экспертиза",
-    description: "Профессиональная оценка соответствия требованиям безопасности",
-    services: [
-      { name: "Аудит по пожарной безопасности (на основании аттестата аккредитации)", price: "по договоренности" },
-      { name: "Аудит по безопасности и охране труда", price: "по договоренности" },
-      { name: "Экспертиза объекта по пожарной безопасности", price: "по договоренности" },
-      { name: "Оценка соответствия требованиям законодательства РК (ПБ, ОТ, АТЗ)", price: "по договоренности" },
-      { name: "Определение степени огнестойкости и класса конструкционной пожарной опасности", price: "от 300 000 ₸" },
-      { name: "Оценка степени рисков по условиям труда", price: "12 000 ₸" },
-    ],
-  },
-  {
-    icon: Lightbulb,
-    title: "Проектирование и консалтинг",
-    description: "Разработка документации и технических решений",
-    services: [
-      { name: "Проектная деятельность 3 категории (на основании лицензии)", price: "по договоренности" },
-      { name: "Разработка комплекса организационно-технических мероприятий", price: "от 250 000 ₸" },
-      { name: "Разработка специальных технических условий (СТУ)", price: "от 800 000 ₸" },
-      { name: "Разработка раздела мероприятий по обеспечению пожарной безопасности", price: "от 500 000 ₸" },
-      { name: "Консультация эксперта по пожарной безопасности", price: "от 20 000 ₸" },
-      { name: "Расчет времени для эвакуации людей при пожаре", price: "от 50 000 ₸" },
-      { name: "Расчет категории производства по взрывопожарной и пожарной опасности", price: "от 200 000 ₸" },
-    ],
-  },
-  {
-    icon: FileText,
-    title: "Аутсорсинг документации",
-    description: "Полное ведение документации по безопасности",
-    services: [
-      { name: "Аутсорсинг по пожарной безопасности (разработка и ведение документации)", price: "по договоренности" },
-      { name: "Аутсорсинг по безопасности и охране труда (разработка и ведение документации)", price: "по договоренности" },
-    ],
-  },
-  {
-    icon: Flame,
-    title: "Перезарядка огнетушителей (порошковые ОП)",
-    description: "Техническое обслуживание, перезарядка и освидетельствование",
-    services: [
-      { name: "Перезарядка ОП-3", price: "1 000 ₸" },
-      { name: "Перезарядка ОП-4", price: "1 200 ₸" },
-      { name: "Перезарядка ОП-5", price: "1 850 ₸" },
-      { name: "Перезарядка ОП-8", price: "2 800 ₸" },
-      { name: "Перезарядка ОП-10", price: "4 500 ₸" },
-      { name: "Перезарядка ОП-25", price: "8 500 ₸" },
-      { name: "Перезарядка ОП-35", price: "12 500 ₸" },
-      { name: "Перезарядка ОП-50", price: "16 500 ₸" },
-      { name: "Перезарядка ОП-80", price: "25 090 ₸" },
-      { name: "Перезарядка ОП-100", price: "30 250 ₸" },
-    ],
-  },
-  {
-    icon: Flame,
-    title: "Перезарядка огнетушителей (углекислотные ОУ)",
-    services: [
-      { name: "Перезарядка ОУ-2", price: "1 800 ₸" },
-      { name: "Перезарядка ОУ-3", price: "2 200 ₸" },
-      { name: "Перезарядка ОУ-4", price: "3 900 ₸" },
-      { name: "Перезарядка ОУ-5", price: "5 900 ₸" },
-      { name: "Перезарядка ОУ-8", price: "6 900 ₸" },
-      { name: "Перезарядка ОУ-10", price: "8 700 ₸" },
-      { name: "Перезарядка ОУ-25", price: "15 000 ₸" },
-    ],
-  },
-  {
-    icon: Settings,
-    title: "Замена комплектующих огнетушителей",
-    description: "Ремонт и замена составных частей",
-    services: [
-      { name: "Замена шланга с распылителем", price: "1 000 ₸" },
-      { name: "Замена ЗПУ (ОП-1–10)", price: "1 800 ₸" },
-      { name: "Замена ЗПУ (ОП-35–80)", price: "7 050 ₸" },
-      { name: "Замена манометра", price: "800 ₸" },
-      { name: "Раструб к ОУ-1–3 с выкидной трубой", price: "2 000 ₸" },
-      { name: "Замена ЗПУ (ОУ-1–10)", price: "4 145 ₸" },
-      { name: "Раструб к ОУ-5", price: "2 700 ₸" },
-      { name: "Покраска огнетушителя ОП-10", price: "2 200 ₸" },
-      { name: "Покраска огнетушителя ОП-35/50", price: "5 500 ₸" },
-      { name: "Переосвидетельствование ОП-5", price: "1 000 ₸" },
-      { name: "Утилизация огнетушителя (с составлением Акта)", price: "500 ₸" },
-    ],
-  },
-  {
-    icon: GraduationCap,
-    title: "Обучение сотрудников",
-    description: "Сертифицированное обучение с выдачей удостоверений",
-    services: [
-      { name: "Безопасность и охрана труда (с сертификатом)", price: "12 000 ₸ / чел" },
-      { name: "Пожарный минимум (с удостоверением)", price: "7 000 ₸ / чел" },
-      { name: "Электробезопасность до 1000В (с допуском)", price: "9 000 ₸ / чел" },
-      { name: "Электробезопасность свыше 1000В (с допуском)", price: "9 000 ₸ / чел" },
-      { name: "Оказание первой медицинской помощи", price: "80 000 ₸ / группа" },
-      { name: "Добровольные пожарные формирования", price: "20 000 ₸ / чел" },
-      { name: "Антикоррупция — Комплаенс", price: "50 000 ₸ / чел" },
-      { name: "Члены Согласительной комиссии", price: "15 000 ₸ / чел" },
-      { name: "Промышленная безопасность", price: "6 000 ₸ / чел" },
-      { name: "Действия при землетрясении", price: "150 000 ₸ / группа" },
-      { name: "Поведенческое обучение NEARMISS", price: "35 000 ₸ / чел" },
-      { name: "Антитеррористическая защищенность", price: "90 000 ₸" },
-    ],
-  },
-  {
-    icon: ShieldCheck,
-    title: "Антитеррористическая защищенность",
-    services: [
-      { name: "Разработка и изготовление «Паспорта антитеррористической защищенности объекта»", price: "по договоренности" },
-    ],
-  },
-  {
-    icon: Settings,
-    title: "Техническое обслуживание систем",
-    description: "Монтаж, ремонт и освидетельствование противопожарных систем",
-    services: [
-      { name: "Обслуживание автоматической пожарной сигнализации", price: "по договоренности" },
-      { name: "Обслуживание систем пожаротушения", price: "по договоренности" },
-      { name: "Обслуживание систем автоматического газового пожаротушения", price: "по договоренности" },
-      { name: "Обслуживание систем автоматического водяного пожаротушения", price: "по договоренности" },
-      { name: "Техническое освидетельствование модуля газового пожаротушения", price: "50 000 ₸" },
-      { name: "Сервисное обслуживание слаботочных систем (видеонаблюдение, связь, охранная сигнализация, СКУД)", price: "по договоренности" },
-      { name: "Интеграция пожарной автоматики с инженерными коммуникациями здания", price: "по договоренности" },
-      { name: "Составление план-графика ППР и ТО систем пожарной автоматики", price: "35 000 ₸" },
-      { name: "Разработка и восстановление проектной документации по пожарной автоматике", price: "по договоренности" },
-      { name: "Разработка и восстановление технической документации (паспорта, формуляры)", price: "80 000 ₸" },
-    ],
-  },
-  {
-    icon: Map,
-    title: "Планы эвакуации",
-    description: "Разработка и изготовление планов эвакуации и схем проезда",
-    services: [
-      { name: "План эвакуаций при ЧС (лист А3, ламинация, каз/рус)", price: "7 000 ₸" },
-      { name: "План эвакуаций при ЧС (табличка, основа ПВХ, ламинация)", price: "8 000 ₸" },
-      { name: "План эвакуаций (в рамке под стеклом, каз/рус)", price: "9 000 ₸" },
-      { name: "Схема проезда пожарных машин (алюкобонд, 1.2×1.2 м)", price: "95 000 ₸" },
-    ],
-  },
-  {
-    icon: Paintbrush,
-    title: "Огнезащитная обработка",
-    services: [
-      { name: "Обработка деревянных конструкций (кровля, перегородки, стропила) — пропитка «ОГНЕЗА»", price: "от 600 ₸ / м²" },
-      { name: "Обработка деревянных конструкций (пути эвакуации) — лак «Авангард-Гелиос»", price: "от 1 500 ₸ / м²" },
-    ],
-  },
-  {
-    icon: FlaskConical,
-    title: "Испытательная пожарная лаборатория",
-    description: "Испытания и проверки с выдачей протоколов",
-    services: [
-      { name: "Испытания параметров систем вентиляции и противодымной защиты", price: "350 000 ₸" },
-      { name: "Испытания обработанных огнезащитой поверхностей (дерево, металл, ткань)", price: "от 40 000 ₸" },
-      { name: "Испытание наружных пожарных металлических лестниц и ограждений кровли", price: "от 6 000 ₸ / п.м." },
-      { name: "Проверка электропроводки, испытание изоляции проводов и заземляющих устройств", price: "от 40 000 ₸" },
-      { name: "Измерение сопротивления петли фаза-нуль", price: "от 40 000 ₸" },
-      { name: "Испытание стеллажей (1 ряд, 1 п.м.)", price: "3 500 ₸" },
-      { name: "Испытание средств огнезащиты древесины", price: "80 000 ₸" },
-      { name: "Испытание средств огнезащиты стальных и ж/б конструкций", price: "150 000 ₸" },
-      { name: "Испытание пожарных кранов и клапанов", price: "80 000 ₸" },
-      { name: "Испытание наружной пожарной металлической лестницы", price: "4 000 ₸" },
-      { name: "Испытание металлического ограждения кровли крыши", price: "4 000 ₸" },
-    ],
-  },
-  {
-    icon: Image,
-    title: "Плакаты по безопасности",
-    description: "Цветные плакаты с ламинацией, на казахском и русском языках",
-    services: [
-      { name: "Плакат «Действия при пожаре»", price: "1 400 ₸" },
-      { name: "Плакат «Использование огнетушителя»", price: "1 400 ₸" },
-      { name: "Плакат «Использование внутреннего пожарного крана»", price: "1 400 ₸" },
-      { name: "Плакат «Первая медицинская помощь»", price: "1 400 ₸" },
-      { name: "Плакат «Эвакуация населения при ЧС»", price: "1 400 ₸" },
-      { name: "Плакат «Электробезопасность»", price: "1 400 ₸" },
-      { name: "Плакат «Техника безопасности на складе»", price: "1 400 ₸" },
-      { name: "Плакат «Компьютерная безопасность»", price: "1 400 ₸" },
-      { name: "Плакат «10 простых шагов при землетрясении»", price: "1 400 ₸" },
-    ],
-  },
-  {
-    icon: BookOpen,
-    title: "Журналы",
-    description: "Журналы регистрации и учёта",
-    services: [
-      { name: "Журнал регистрации вводного инструктажа", price: "1 400 ₸" },
-      { name: "Журнал регистрации инструктажа по пожарной безопасности", price: "1 400 ₸" },
-      { name: "Журнал регистрации инструктажа по безопасности и охране труда", price: "1 400 ₸" },
-      { name: "Журнал учета и технического обслуживания огнетушителей", price: "1 400 ₸" },
-      { name: "Журнал технического обслуживания пожарной автоматики", price: "1 400 ₸" },
-      { name: "Журнал перекатки пожарных рукавов", price: "1 400 ₸" },
-      { name: "Журнал учета несчастных случаев", price: "1 400 ₸" },
-      { name: "Журнал трехступенчатого контроля за состоянием ОТ и ТБ", price: "1 400 ₸" },
-      { name: "Журнал учебных мероприятий по антитеррористической подготовке", price: "1 400 ₸" },
-    ],
-  },
-  {
-    icon: Tag,
-    title: "Знаки и таблички",
-    description: "Знаки эвакуации и пожарной безопасности",
-    services: [
-      { name: "Знаки (наклейка, плотность 250гр)", price: "350 ₸" },
-      { name: "Знаки (табличка, основа ПВХ 3мм, винил)", price: "500 ₸" },
-      { name: "Знаки (алюкобонд 3.5мм, уличные, светоотражающие)", price: "2 700 ₸" },
-      { name: "Знаки (светонакопительные ФЭС, основа ПВХ 3мм)", price: "2 000 ₸" },
-    ],
-  },
-  {
-    icon: LayoutGrid,
-    title: "Информационные стенды",
-    description: "Основа ПВХ (5мм), кайма под золото",
-    services: [
-      { name: "Стенд «Уголок гражданской защиты»", price: "3 000 ₸" },
-      { name: "Стенд «Уголок пожарной безопасности»", price: "3 000 ₸" },
-      { name: "Стенд «Техника безопасности»", price: "3 000 ₸" },
-      { name: "Стенд «Компьютерная безопасность»", price: "3 000 ₸" },
-      { name: "Стенд «Безопасность и Охрана труда»", price: "3 000 ₸" },
-      { name: "Стенд «Электробезопасность»", price: "3 000 ₸" },
-      { name: "Стенд «Безопасность на воде»", price: "3 000 ₸" },
-      { name: "Стенд «Оказание первой медицинской помощи»", price: "3 000 ₸" },
-    ],
-  },
-];
+interface CategoryGroup {
+  id: string;
+  name: string;
+  sort_order: number;
+  services: ServiceRow[];
+}
 
-const CollapsibleServiceBlock = ({ category, index }: { category: ServiceCategory; index: number }) => {
+// ─── Static metadata: icons & descriptions ───────────────────────────────────
+// Maintained in the frontend; new admin-created categories get a fallback icon.
+
+interface CategoryMeta {
+  icon: React.ElementType;
+  description?: string;
+}
+
+const CATEGORY_META: Record<string, CategoryMeta> = {
+  "Аудит и экспертиза": {
+    icon: Search,
+    description: "Профессиональная оценка соответствия требованиям безопасности",
+  },
+  "Проектирование и консалтинг": {
+    icon: Lightbulb,
+    description: "Разработка документации и технических решений",
+  },
+  "Аутсорсинг документации": {
+    icon: FileText,
+    description: "Полное ведение документации по безопасности",
+  },
+  "Перезарядка огнетушителей (порошковые ОП)": {
+    icon: Flame,
+    description: "Техническое обслуживание, перезарядка и освидетельствование",
+  },
+  "Перезарядка огнетушителей (углекислотные ОУ)": {
+    icon: Flame,
+  },
+  "Замена комплектующих огнетушителей": {
+    icon: Settings,
+    description: "Ремонт и замена составных частей",
+  },
+  "Обучение сотрудников": {
+    icon: GraduationCap,
+    description: "Сертифицированное обучение с выдачей удостоверений",
+  },
+  "Антитеррористическая защищенность": {
+    icon: ShieldCheck,
+  },
+  "Техническое обслуживание систем": {
+    icon: Settings,
+    description: "Монтаж, ремонт и освидетельствование противопожарных систем",
+  },
+  "Планы эвакуации": {
+    icon: Map,
+    description: "Разработка и изготовление планов эвакуации и схем проезда",
+  },
+  "Огнезащитная обработка": {
+    icon: Paintbrush,
+  },
+  "Испытательная пожарная лаборатория": {
+    icon: FlaskConical,
+    description: "Испытания и проверки с выдачей протоколов",
+  },
+  "Плакаты по безопасности": {
+    icon: Image,
+    description: "Цветные плакаты с ламинацией, на казахском и русском языках",
+  },
+  "Журналы": {
+    icon: BookOpen,
+    description: "Журналы регистрации и учёта",
+  },
+  "Знаки и таблички": {
+    icon: Tag,
+    description: "Знаки эвакуации и пожарной безопасности",
+  },
+  "Информационные стенды": {
+    icon: LayoutGrid,
+    description: "Основа ПВХ (5мм), кайма под золото",
+  },
+};
+
+const DEFAULT_META: CategoryMeta = { icon: LayoutGrid };
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatPrice(service: ServiceRow): string {
+  if (service.price_type === "negotiable" || service.price === null) {
+    return "по договоренности";
+  }
+  const symbol = service.currency === "KZT" ? "₸" : service.currency;
+  return `${service.price.toLocaleString("ru-RU")} ${symbol}`;
+}
+
+// ─── CollapsibleServiceBlock ─────────────────────────────────────────────────
+
+const VISIBLE_LIMIT = 4;
+
+interface CollapsibleServiceBlockProps {
+  category: CategoryGroup;
+  index: number;
+}
+
+const CollapsibleServiceBlock = ({ category, index }: CollapsibleServiceBlockProps) => {
   const { ref, inView } = useInView(0.05);
+  const meta = CATEGORY_META[category.name] ?? DEFAULT_META;
   const isAlt = index % 2 === 1;
-  const VISIBLE_LIMIT = 4;
   const hasMany = category.services.length > VISIBLE_LIMIT;
   const [expanded, setExpanded] = useState(!hasMany);
 
-  const visibleServices = expanded ? category.services : category.services.slice(0, VISIBLE_LIMIT);
+  const visibleServices = expanded
+    ? category.services
+    : category.services.slice(0, VISIBLE_LIMIT);
   const hiddenCount = category.services.length - VISIBLE_LIMIT;
 
   return (
@@ -261,23 +138,25 @@ const CollapsibleServiceBlock = ({ category, index }: { category: ServiceCategor
       <div className={`container-narrow ${inView ? "animate-fade-up" : "opacity-0"}`}>
         <div className="flex items-start gap-4 mb-3">
           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-            <category.icon className="w-6 h-6 text-primary" />
+            <meta.icon className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h3 className="text-2xl font-bold text-foreground">{category.title}</h3>
-            {category.description && (
-              <p className="text-muted-foreground text-sm mt-1">{category.description}</p>
+            <h3 className="text-2xl font-bold text-foreground">{category.name}</h3>
+            {meta.description && (
+              <p className="text-muted-foreground text-sm mt-1">{meta.description}</p>
             )}
           </div>
         </div>
         <div className="grid gap-2.5 mt-6">
           {visibleServices.map((service) => (
             <div
-              key={service.name}
+              key={service.id}
               className="flex items-center justify-between bg-card rounded-lg px-5 py-3.5 shadow-card hover:shadow-soft transition-shadow duration-300 gap-4"
             >
-              <span className="text-foreground text-sm md:text-base">{service.name}</span>
-              <span className="text-accent font-semibold text-sm whitespace-nowrap">{service.price}</span>
+              <span className="text-foreground text-sm md:text-base">{service.title}</span>
+              <span className="text-accent font-semibold text-sm whitespace-nowrap">
+                {formatPrice(service)}
+              </span>
             </div>
           ))}
         </div>
@@ -298,23 +177,125 @@ const CollapsibleServiceBlock = ({ category, index }: { category: ServiceCategor
   );
 };
 
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+
+const SkeletonBlock = ({ alt }: { alt: boolean }) => (
+  <div className={`py-12 md:py-16 px-4 ${alt ? "bg-muted/50" : "bg-background"}`}>
+    <div className="container-narrow">
+      <div className="flex items-start gap-4 mb-6">
+        <div className="w-12 h-12 rounded-xl bg-muted animate-pulse shrink-0" />
+        <div className="flex-1 space-y-2">
+          <div className="h-6 w-48 rounded bg-muted animate-pulse" />
+          <div className="h-4 w-72 rounded bg-muted animate-pulse" />
+        </div>
+      </div>
+      <div className="grid gap-2.5">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-12 rounded-lg bg-muted animate-pulse" />
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// ─── ServicesSection ─────────────────────────────────────────────────────────
+
 const ServicesSection = () => {
   const { ref, inView } = useInView();
+  const [groups, setGroups] = useState<CategoryGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const [catsRes, prodsRes] = await Promise.all([
+          supabase
+            .from("categories")
+            .select("id, name, sort_order")
+            .order("sort_order")
+            .order("created_at"),
+          supabase
+            .from("products")
+            .select("id, title, price_type, price, currency, sort_order, category_id")
+            .eq("is_active", true)
+            .order("sort_order")
+            .order("created_at"),
+        ]);
+
+        if (catsRes.error) throw catsRes.error;
+        if (prodsRes.error) throw prodsRes.error;
+
+        const cats = catsRes.data ?? [];
+        const prods = prodsRes.data ?? [];
+
+        const grouped: CategoryGroup[] = cats
+          .map((cat) => ({
+            id: cat.id,
+            name: cat.name,
+            sort_order: cat.sort_order,
+            services: prods.filter((p) => p.category_id === cat.id),
+          }))
+          .filter((g) => g.services.length > 0);
+
+        setGroups(grouped);
+      } catch (err) {
+        console.error(err);
+        setError("Не удалось загрузить каталог услуг");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadCatalog();
+  }, []);
 
   return (
     <section id="services">
       <div className="section-padding bg-background pb-4" ref={ref}>
-        <div className={`container-narrow text-center ${inView ? "animate-fade-up" : "opacity-0"}`}>
-          <p className="text-accent font-semibold text-sm uppercase tracking-widest mb-3">Услуги</p>
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Полный каталог услуг</h2>
+        <div
+          className={`container-narrow text-center ${
+            inView ? "animate-fade-up" : "opacity-0"
+          }`}
+        >
+          <p className="text-accent font-semibold text-sm uppercase tracking-widest mb-3">
+            Услуги
+          </p>
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            Полный каталог услуг
+          </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Более 100 услуг в области пожарной безопасности, охраны труда и технического обслуживания
+            Более 100 услуг в области пожарной безопасности, охраны труда и технического
+            обслуживания
           </p>
         </div>
       </div>
-      {categories.map((cat, i) => (
-        <CollapsibleServiceBlock key={cat.title + i} category={cat} index={i} />
-      ))}
+
+      {loading && (
+        <>
+          {[0, 1, 2, 3].map((i) => (
+            <SkeletonBlock key={i} alt={i % 2 === 1} />
+          ))}
+        </>
+      )}
+
+      {error && (
+        <div className="py-16 text-center text-muted-foreground">
+          <p>{error}</p>
+        </div>
+      )}
+
+      {!loading && !error && groups.length === 0 && (
+        <div className="py-16 text-center text-muted-foreground">
+          <p>Каталог пока пуст</p>
+        </div>
+      )}
+
+      {!loading &&
+        !error &&
+        groups.map((cat, i) => (
+          <CollapsibleServiceBlock key={cat.id} category={cat} index={i} />
+        ))}
     </section>
   );
 };
