@@ -3,6 +3,7 @@ export type PriceType = "negotiable" | "fixed";
 export interface Category {
   id: string;
   name: string;
+  sort_order: number;
   created_at: string;
 }
 

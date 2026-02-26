@@ -5,7 +5,8 @@ export async function fetchCategories(): Promise<Category[]> {
   const { data, error } = await supabase
     .from("categories")
     .select("*")
-    .order("name");
+    .order("sort_order")
+    .order("created_at");
   if (error) throw error;
   return data;
 }
