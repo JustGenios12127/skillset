@@ -1,4 +1,4 @@
-const WHATSAPP_NUMBER = "77071234567"; // ← замени на реальный номер
+const WHATSAPP_NUMBER = "77052707070"; // ← замени на реальный номер
 const WHATSAPP_MESSAGE = "Здравствуйте! Хочу получить консультацию.";
 
 const WhatsAppButton = () => {
